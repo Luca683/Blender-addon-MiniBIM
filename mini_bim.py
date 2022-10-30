@@ -233,35 +233,35 @@ class export(bpy.types.Operator):
 		return {"FINISHED"}
 	
 class query(bpy.types.Operator):
-		"""Fai una query"""
-		bl_idname = "mesh.query_database"
-		bl_label = "Query"
+	"""Fai una query"""
+	bl_idname = "mesh.query_database"
+	bl_label = "Query"
 
-		def execute(self, context):
-			restore_scene()
-			myresult = query_database()
+	def execute(self, context):
+		restore_scene()
+		myresult = query_database()
 
-			myObj = {}
-			for obj in bpy.data.objects:
-				myObj[obj] = []
+		myObj = {}
+		for obj in bpy.data.objects:
+			myObj[obj] = []
 
-			for result in myresult:
-				name_vertex_group = result[1]
-				name_mesh = result[2]
+		for result in myresult:
+			name_vertex_group = result[1]
+			name_mesh = result[2]
 
-				selected_mesh = bpy.data.objects[name_mesh]
-				selected_vg = bpy.data.objects[name_mesh].vertex_groups[name_vertex_group].index
+			selected_mesh = bpy.data.objects[name_mesh]
+			selected_vg = bpy.data.objects[name_mesh].vertex_groups[name_vertex_group].index
 
-				myObj[selected_mesh].append(selected_vg)
+			myObj[selected_mesh].append(selected_vg)
 
-			for obj in myObj:
-				if(len(myObj[obj])!=0):
-					select_vertex(obj, myObj)
-					color_vertex(obj, myObj)
+		for obj in myObj:
+			if(len(myObj[obj])!=0):
+				select_vertex(obj, myObj)
+				color_vertex(obj, myObj)
 
-			hide_unselected_vertices()
+		hide_unselected_vertices()
 
-			return {"FINISHED"}
+		return {"FINISHED"}
 
 class restore(bpy.types.Operator):
 	"""Ripristina tutta la scena"""
