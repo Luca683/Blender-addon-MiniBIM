@@ -8,16 +8,13 @@ bl_info = {
 	"description": "",
 }
 
+import sqlite3
 import bpy
-import mysql.connector
+#import mysql.connector
 import bmesh
 from collections import Counter
 
-mydb = mysql.connector.connect(
-	host = "localhost",
-	user = "root",
-)
-mydb.autocommit = False
+mydb = sqlite3.connect('blender.db')
 mycursor = mydb.cursor()
 
 def add_mesh(self, context):
