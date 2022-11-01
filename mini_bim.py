@@ -10,11 +10,10 @@ bl_info = {
 
 import sqlite3
 import bpy
-#import mysql.connector
 import bmesh
 from collections import Counter
 
-mydb = sqlite3.connect('blender.db')
+mydb = sqlite3.connect(':memory:')
 mycursor = mydb.cursor()
 
 def add_mesh(self, context):
@@ -63,23 +62,15 @@ class MyProperties(bpy.types.PropertyGroup):
 
 	check : bpy.props.BoolProperty(name = "", default = False)
 
-def create_database():
-	database = 'blender'
-	mycursor.execute("CREATE DATABASE IF NOT EXISTS %s DEFAULT CHARACTER SET 'utf8'" % database)
-	mydb.database = database
-
 def create_table():
-	tableExist = False
-	mycursor.execute("SHOW TABLES")
-
-	for x in mycursor:
-		if "vertex_group" in x:
-			tableExist = True
-			break
-
-	if tableExist == True:
-		mycursor.execute("DROP TABLE vertex_group")
-	mycursor.execute("CREATE TABLE vertex_group(id INT AUTO_INCREMENT PRIMARY KEY, name_vertex_group VARCHAR(255), mesh VARCHAR(255), num_vertex_vg INT, num_face_vg INT, area_vg FLOAT)")
+	mycursor.execute("""CREATE TABLE IF NOT EXISTS vertex_group(
+						id INTEGER PRIMARY KEY, 
+						name_vertex_group text, 
+						mesh text, 
+						num_vertex_vg integer, 
+						num_face_vg integer, 
+						area_vg real
+						)""")
 
 def count_vertex(obj, num_groups):
 	vg_num_vertices = [0] * num_groups
@@ -111,10 +102,16 @@ def count_face_area(obj, num_groups):
 
 def insert_database(obj, num_groups, group_vertices, group_faces, area):
 	for i in range(num_groups):
-		sql = "INSERT INTO vertex_group (name_vertex_group, mesh, num_vertex_vg, num_face_vg, area_vg) VALUES (%s, %s, %s, %s, %s)"
-		val = (obj.vertex_groups[i].name, obj.name, group_vertices[i], group_faces[i], area[i])
+		val = {
+			'id': i,
+			'name_vertex_group': obj.vertex_groups[i].name,
+			'mesh': obj.name,
+			'num_vertex_vg': group_vertices[i],
+			'num_face_vg': group_faces[i],
+			'area_vg': area[i],
+		}
 		
-		mycursor.execute(sql, val)	
+		mycursor.execute("INSERT or REPLACE INTO vertex_group VALUES(:id, :name_vertex_group, :mesh, :num_vertex_vg, :num_face_vg, :area_vg)", val)	
 
 def deselect_vertex():
 	bpy.ops.object.mode_set(mode="EDIT") 
@@ -143,14 +140,32 @@ def process_query():
 	min_area = bpy.context.scene.my_tool.min_area
 	max_area = bpy.context.scene.my_tool.max_area
 	if select_mesh=="All" and select_vertex_group=="All":
-		sql = "SELECT * FROM vertex_group WHERE num_vertex_vg>=%s AND num_vertex_vg<=%s AND num_face_vg>=%s AND num_face_vg<=%s AND area_vg>=%s AND area_vg<=%s"
-		val = (min_vertex, max_vertex, min_face, max_face, min_area, max_area)
+		sql = "SELECT * FROM vertex_group WHERE num_vertex_vg >= :min_num_vertex_vg AND num_vertex_vg <= :max_num_vertex_vg AND num_face_vg >= :min_num_face_vg AND num_face_vg <= :max_num_face_vg AND area_vg >= :min_area_vg AND area_vg <= :max_area_vg"
+		val = {
+			'min_num_vertex_vg': min_vertex, 
+			'max_num_vertex_vg': max_vertex, 
+			'min_num_face_vg': min_face, 
+			'max_num_face_vg': max_face, 
+			'min_area_vg': min_area, 
+			'max_area_vg': max_area
+		}
 	if select_mesh!="All" and select_vertex_group == "All":
-		sql = "SELECT * FROM vertex_group WHERE mesh = %s AND num_vertex_vg>=%s AND num_vertex_vg<=%s AND num_face_vg>=%s AND num_face_vg<=%s AND area_vg>=%s AND area_vg<=%s"
-		val = (select_mesh, min_vertex, max_vertex, min_face, max_face, min_area, max_area)
+		sql = "SELECT * FROM vertex_group WHERE mesh = :mesh AND num_vertex_vg >= :min_num_vertex_vg AND num_vertex_vg <= :max_num_vertex_vg AND num_face_vg >= :min_num_face_vg AND num_face_vg <= :max_num_face_vg AND area_vg >= :min_area_vg AND area_vg <= :max_area_vg"
+		val = {
+			'mesh': select_mesh,
+			'min_num_vertex_vg': min_vertex, 
+			'max_num_vertex_vg': max_vertex, 
+			'min_num_face_vg': min_face, 
+			'max_num_face_vg': max_face, 
+			'min_area_vg': min_area, 
+			'max_area_vg': max_area
+		}
 	if select_mesh!="All" and select_vertex_group!="All":
-		sql = "SELECT * FROM vertex_group WHERE name_vertex_group = %s AND mesh = %s"
-		val = (select_vertex_group, select_mesh,)
+		sql = "SELECT * FROM vertex_group WHERE name_vertex_group = :name_vg AND mesh = :mesh"
+		val = {
+			'name_vg': select_vertex_group,
+			'mesh': select_mesh,
+		}
 	return sql, val
 
 def query_database():
@@ -209,7 +224,6 @@ class export(bpy.types.Operator):
 	bl_label = "Export data"
 
 	def execute(self, context):
-		create_database()
 		create_table()
 
 		myObjects = bpy.data.objects
